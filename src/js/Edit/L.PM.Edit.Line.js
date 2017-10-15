@@ -162,32 +162,27 @@ Edit.Line = Edit.extend({
         // handle coord-rings (outer, inner, etc)
         const handleRing = (coordsArr) => {
             // the marker array, it includes only the markers of vertexes (no middle markers)
-            const ringArr = coordsArr.map(this._createMarker, this);
+            const ringMarkerArr = coordsArr.map(this._createMarker, this);
 
             // create small markers in the middle of the regular markers
-            coordsArr.map((v, k) => {
-                let nextIndex;
+            const ringMiddleMarkerArr = coordsArr
+                .map((v, k) => {
+                    const nextIndex = this.isPolygon() ? (k + 1) % coordsArr.length : k + 1;
+                    return this._createMiddleMarker(ringMarkerArr[k], ringMarkerArr[nextIndex]);
+                })
+                .filter(marker => !!marker);
 
-                if (this.isPolygon()) {
-                    nextIndex = (k + 1) % coordsArr.length;
-                } else {
-                    nextIndex = k + 1;
-                }
-                return this._createMiddleMarker(ringArr[k], ringArr[nextIndex]);
+            // add all markers of the ring to the markerGroup
+            [...ringMarkerArr, ...ringMiddleMarkerArr].forEach((marker) => {
+                this._markerGroup.addLayer(marker);
             });
 
-            return ringArr;
+            // return only the markers, refs to middlemarkers are not stored
+            return ringMarkerArr;
         };
 
-        this._markers = [];
-
-        if (this.isPolygon()) {
-            // coords is a multidimansional array, handle all rings
-            this._markers = coords.map(handleRing, this);
-        } else {
-            // coords is one dimensional, handle the ring
-            this._markers = handleRing(coords);
-        }
+        // create markers for the coords (one- and multi-dimensional arrays)
+        this._markers = this.isPolygon() ? coords.map(handleRing, this) : handleRing(coords);
 
         if (this.options.snappable) {
             this._initSnappableMarkers();
@@ -207,8 +202,6 @@ Edit.Line = Edit.extend({
         marker.on('move', this._onMarkerDrag, this);
         marker.on('dragend', this._onMarkerDragEnd, this);
         marker.on('contextmenu', this._removeMarker, this);
-
-        this._markerGroup.addLayer(marker);
 
         return marker;
     },
@@ -285,8 +278,10 @@ Edit.Line = Edit.extend({
         this._layer.setLatLngs(coords);
 
         // create the new middlemarkers
-        this._createMiddleMarker(leftM, newM);
-        this._createMiddleMarker(newM, rightM);
+        const mm1 = this._createMiddleMarker(leftM, newM);
+        const mm2 = this._createMiddleMarker(newM, rightM);
+        this._markerGroup.addLayer(mm1);
+        this._markerGroup.addLayer(mm2);
 
         // fire edit event
         this._fireEdit();
@@ -387,7 +382,8 @@ Edit.Line = Edit.extend({
         if (rightMarkerIndex !== leftMarkerIndex) {
             const leftM = markerArr[leftMarkerIndex];
             const rightM = markerArr[rightMarkerIndex];
-            this._createMiddleMarker(leftM, rightM);
+            const mm = this._createMiddleMarker(leftM, rightM);
+            this._markerGroup.addLayer(mm);
         }
 
         // remove the marker from the markers array
