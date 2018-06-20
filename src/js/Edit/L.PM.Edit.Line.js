@@ -285,45 +285,49 @@ Edit.Line = Edit.extend({
     // lineEditZoomThreshold. Idea from from https://github.com/tkrajina/leaflet-editable-polyline.
     _toggleMarkerVisibility: function() {
 
-        var bounds = this._map.getBounds();
+        if(this.enabled()) {
 
-        var check = function(marker) {
-            if(marker) {
+            var bounds = this._map.getBounds();
 
-                var visible = true;
+            var check = function(marker) {
+                if(marker) {
 
-                // Don't show markers not within the visible bounds for performance boost
-                if(bounds.contains(marker.getLatLng()) == false) {
-                    visible = false;
+                    var visible = true;
+
+                    // Don't show markers not within the visible bounds for performance boost
+                    if(bounds.contains(marker.getLatLng()) == false) {
+                        visible = false;
+                    }
+
+                    // Optionally have a minimum zoom for editing
+                    if(this._map.options.lineEditZoomThreshold && this._map.getZoom() < this._map.options.lineEditZoomThreshold) {
+                        visible = false;
+                    }
+
+                    if(visible == true) {
+                        this._markerGroup.addLayer(marker);                    
+                    }
+                    else {
+                        this._markerGroup.removeLayer(marker);
+                    }            
                 }
+            }
 
-                // Optionally have a minimum zoom for editing
-                if(this._map.options.lineEditZoomThreshold && this._map.getZoom() < this._map.options.lineEditZoomThreshold) {
-                    visible = false;
-                }
+            for(var i=0;i<this._markers.length;i++) {
+                var marker = this._markers[i];
 
-                if(visible == true) {
-                    this._markerGroup.addLayer(marker);                    
+                if(Array.isArray(marker)) {
+                    for(var j=0;j<marker.length;j++) {
+                        var middleMarker = marker[j];
+                        check.bind(this, middleMarker)();
+                    }
                 }
                 else {
-                    this._markerGroup.removeLayer(marker);
-                }            
-            }
-        }
-
-        for(var i=0;i<this._markers.length;i++) {
-            var marker = this._markers[i];
-
-            if(Array.isArray(marker)) {
-                for(var j=0;j<marker.length;j++) {
-                    var middleMarker = marker[j];
-                    check.bind(this, middleMarker)();
+                    check.bind(this, marker)();
+                    check.bind(this, marker._middleMarkerNext)();
+                    check.bind(this, marker._middleMarkerPrev)();                
                 }
-            }
-            else {
-                check.bind(this, marker)();
-                check.bind(this, marker._middleMarkerNext)();
-                check.bind(this, marker._middleMarkerPrev)();                
+
             }
 
         }
