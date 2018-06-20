@@ -486,6 +486,10 @@ Edit.Line = Edit.extend({
             indexPath,
             // TODO: maybe add latlng as well?
         });
+
+        // show new middlemarkers
+        this._toggleMarkerVisibility();   
+                
     },
     isEmptyDeep(l) {
         // thanks for the function, Felix Heck
