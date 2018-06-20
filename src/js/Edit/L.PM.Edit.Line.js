@@ -60,6 +60,16 @@ Edit.Line = Edit.extend({
         if (!this.options.allowSelfIntersection) {
             this._handleLayerStyle();
         }
+
+        // show markers based on new bounds and zoom
+        this._map.on('dragend', function(event) {
+            this._toggleMarkerVisibility();
+        }.bind(this));                    
+
+        this._map.on('zoomend', function(event) {
+            this._toggleMarkerVisibility();
+        }.bind(this));        
+
     },
 
     _onLayerRemove(e) {
@@ -200,10 +210,15 @@ Edit.Line = Edit.extend({
         if (this.options.snappable) {
             this._initSnappableMarkers();
         }
+
+        // show markers
+        this._toggleMarkerVisibility();
+
     },
 
     // creates initial markers for coordinates
     _createMarker(latlng) {
+
         const marker = new L.Marker(latlng, {
             draggable: !this.options.preventVertexEdit,
             icon: L.divIcon({ className: 'marker-icon' }),
@@ -218,8 +233,6 @@ Edit.Line = Edit.extend({
         if (!this.options.preventMarkerRemoval) {
             marker.on('contextmenu', this._removeMarker, this);
         }
-
-        this._markerGroup.addLayer(marker);
 
         return marker;
     },
@@ -265,6 +278,56 @@ Edit.Line = Edit.extend({
         });
 
         return middleMarker;
+    },
+
+    // toggle whether markers are visible or not. For performance reasons if
+    // loading a large amount of lines you can toggle based on zoom level using
+    // lineEditZoomThreshold. Idea from from https://github.com/tkrajina/leaflet-editable-polyline.
+    _toggleMarkerVisibility: function() {
+
+        var bounds = this._map.getBounds();
+
+        var check = function(marker) {
+            if(marker) {
+
+                var visible = true;
+
+                // Don't show markers not within the visible bounds for performance boost
+                if(bounds.contains(marker.getLatLng()) == false) {
+                    visible = false;
+                }
+
+                // Optionally have a minimum zoom for editing
+                if(this._map.options.lineEditZoomThreshold && this._map.getZoom() < this._map.options.lineEditZoomThreshold) {
+                    visible = false;
+                }
+
+                if(visible == true) {
+                    this._markerGroup.addLayer(marker);                    
+                }
+                else {
+                    this._markerGroup.removeLayer(marker);
+                }            
+            }
+        }
+
+        for(var i=0;i<this._markers.length;i++) {
+            var marker = this._markers[i];
+
+            if(Array.isArray(marker)) {
+                for(var j=0;j<marker.length;j++) {
+                    var middleMarker = marker[j];
+                    check.bind(this, middleMarker)();
+                }
+            }
+            else {
+                check.bind(this, marker)();
+                check.bind(this, marker._middleMarkerNext)();
+                check.bind(this, marker._middleMarkerPrev)();                
+            }
+
+        }
+
     },
 
     // adds a new marker from a middlemarker
@@ -314,6 +377,10 @@ Edit.Line = Edit.extend({
         if (this.options.snappable) {
             this._initSnappableMarkers();
         }
+
+        // show new middlemarkers
+        this._toggleMarkerVisibility();
+
     },
 
     _removeMarker(e) {
